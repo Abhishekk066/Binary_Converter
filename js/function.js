@@ -55,6 +55,79 @@ function formateNumsSpace(array) {
   return { numsDecimalfill, numsDecimalfillSpace };
 }
 
+function fractionalToBinary(frac, precision = 10) {
+  const result = [];
+  let count = 0;
+  
+  while (frac > 0 && count < precision) {
+    frac *= 2;
+    if (frac >= 1) {
+      result.push(1);
+      frac -= 1;
+    } else {
+      result.push(0);
+    }
+    count++;
+  }
+  
+  return result.join('');
+}
+
+function fractionalToOctal(frac, precision = 10) {
+  const result = [];
+  let count = 0;
+  
+  while (frac > 0 && count < precision) {
+    frac *= 8;
+    const digit = Math.floor(frac);
+    result.push(digit);
+    frac -= digit;
+    count++;
+  }
+  
+  return result.join('');
+}
+
+function fractionalToHex(frac, precision = 10) {
+  const result = [];
+  let count = 0;
+  const hexChars = '0123456789ABCDEF';
+  
+  while (frac > 0 && count < precision) {
+    frac *= 16;
+    const digit = Math.floor(frac);
+    result.push(hexChars[digit]);
+    frac -= digit;
+    count++;
+  }
+  
+  return result.join('');
+}
+
+function binaryFractionToDecimal(binaryFrac) {
+  let decimal = 0;
+  for (let i = 0; i < binaryFrac.length; i++) {
+    decimal += parseInt(binaryFrac[i]) * Math.pow(2, -(i + 1));
+  }
+  return decimal;
+}
+
+function octalFractionToDecimal(octalFrac) {
+  let decimal = 0;
+  for (let i = 0; i < octalFrac.length; i++) {
+    decimal += parseInt(octalFrac[i]) * Math.pow(8, -(i + 1));
+  }
+  return decimal;
+}
+
+function hexFractionToDecimal(hexFrac) {
+  let decimal = 0;
+  for (let i = 0; i < hexFrac.length; i++) {
+    decimal += parseInt(hexFrac[i], 16) * Math.pow(16, -(i + 1));
+  }
+  return decimal;
+}
+
 //------------------------ decimal to binary --------------------
 
 const input1 = document.getElementById("input");
@@ -108,14 +181,16 @@ function extractBinary(n) {
   };
 }
 
-let decimalToBinaryContent = ``;
-
 function decimalToBinary() {
-  const value = input1.value;
-  const nums = parseInt(Number(value));
+  let value = input1.value;
+  value = value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   input1.value = value;
 
   if (value.length > 0) {
+    const parts = value.split('.');
+    const intPart = parseInt(parts[0]) || 0;
+    const fracPart = parts[1] ? parseFloat('0.' + parts[1]) : 0;
+    
     const {
       binArrayReversed,
       binArrayColorReversed,
@@ -123,15 +198,16 @@ function decimalToBinary() {
       quoData,
       remData,
       dataCount,
-    } = extractBinary(nums);
+    } = extractBinary(intPart);
+    
+    const fracBinary = fracPart > 0 ? fractionalToBinary(fracPart) : '';
+    const fullBinary = fracBinary ? binArrayReversed + '.' + fracBinary : binArrayReversed;
+    
     const remDataReverse = [...remData]
       .map((e) => e + " ")
       .reverse()
       .join("");
 
-    if (value.length > 1) {
-      input1.value = nums;
-    }
     let filteredContent = ``;
     let tableContent =
       "<table><tr><th>Step</th><th>Divisor</th><th>Quotient</th><th>Remainder</th></tr>";
@@ -139,27 +215,41 @@ function decimalToBinary() {
       tableContent += `<tr><td>${dataCount[i]}</td><td>${divData[i]}</td><td>${quoData[i]}</td><td>${remData[i]}</td></tr>`;
     }
     tableContent += "</table>";
-    if (nums >= 2) {
+    
+    if (intPart >= 2) {
       filteredContent = ` 
           ${tableContent}
           <p class="show-num"> Represent it as the last quotient <b>1</b> followed
           by the remainders from bottom to top <b>${remDataReverse}</b>, like this : 
           <span class="s-n">${binArrayReversed}</span></p>`;
+      
+      if (fracBinary) {
+        filteredContent += `<p class="show-num">Fractional part converted: <b>0.${parts[1]}</b> to binary: <b>.${fracBinary}</b></p>`;
+      }
     } else {
-      filteredContent = `<p class="message">No Need to Conversion Steps</p>`;
+      if (fracBinary && intPart < 2) {
+        filteredContent = `<p class="message">Integer part needs no conversion. Fractional part: <b>.${fracBinary}</b></p>`;
+      } else {
+        filteredContent = `<p class="message">No Need to Conversion Steps</p>`;
+      }
     }
+    
+    const fullBinaryColored = binArrayColorReversed + (fracBinary ? '.' + fracBinary.split('').map(b => 
+      b === '0' ? `<span class="zero-c">${b}</span>` : `<span class="one-c">${b}</span>`
+    ).join('') : '');
+    
     result.innerHTML = `
-      <div class="numbers">${binArrayColorReversed}</div>
+      <div class="numbers">${fullBinaryColored}</div>
        <div class="table-container">
          <p class="head">Decimal Digit:</p>
-          <div class="number">${nums}</div>
+          <div class="number">${value}</div>
         <p class="head pad">In Binary Conversion:</p>
-        <div class="number">${binArrayReversed}</div>
+        <div class="number">${fullBinary}</div>
       </div>
        <div class="table-container">
         <p class="head">Conversion in base:</p>
         <div class="base">
-          <p>(${nums})<sub>10</sub> = (${binArrayReversed})<sub>2</sub></p>
+          <p>(${value})<sub>10</sub> = (${fullBinary})<sub>2</sub></p>
         </div>
       </div>
       <div class="table-container">
@@ -205,55 +295,83 @@ function extractDecimal(nums) {
 
 function binaryToDecimal() {
   const value = input2.value.trim();
-  const nums = value.split("").filter((e) => e == "0" || e == "1");
+  const parts = value.split('.');
+  const intPart = parts[0] || '';
+  const fracPart = parts[1] || '';
+  
+  const nums = intPart.split("").filter((e) => e == "0" || e == "1");
+  const fracNums = fracPart.split("").filter((e) => e == "0" || e == "1");
 
   if (nums.length >= 2 && nums[0] == 0) {
     nums.shift();
   }
-  input2.value = nums.join("");
+  
+  const displayValue = nums.join("") + (fracNums.length > 0 ? '.' + fracNums.join("") : '');
+  input2.value = displayValue;
+  
   if (value.length > 0) {
     if (value >= 2) {
       result2.innerHTML = `<div class="table-container">
          <p class="message">Enter number combination of 0 and 1:</p>
       </div>`;
     }
-    if (nums.length !== 0) {
-      const data = extractDecimal(nums);
+    if (nums.length !== 0 || fracNums.length !== 0) {
+      const intDecimal = nums.length > 0 ? extractDecimal(nums).deciNum : 0;
+      const fracDecimal = fracNums.length > 0 ? binaryFractionToDecimal(fracNums.join('')) : 0;
+      const decimalResult = intDecimal + fracDecimal;
+      
+      const data = extractDecimal(nums.length > 0 ? nums : ['0']);
       const coloredDecimalResult = data.coloredDeciNum;
-      const decimalResult = data.deciNum;
       const calData = data.calData;
       const numsReversed = nums.slice().reverse();
+      
       let tableContent =
         "<table><tr><th>Step</th><th>Conversion</th><th>Power</th></tr>";
-      let paraContent = `<div class="solve"><p class="num">${nums.join(
-        ""
-      )}</p><div class="cal-con"><p class="cal">`;
+      let paraContent = `<div class="solve"><p class="num">${displayValue}</p><div class="cal-con"><p class="cal">`;
+      
       for (let i = numsReversed.length - 1; i >= 0; i--) {
         tableContent += `<tr><td>${numsReversed.length - i}.</td><td><span>${
           numsReversed[i]
         }</span> x <span>2<sup>${i}</sup></span></td><td>${i}</td></tr>`;
         paraContent += `<span class="n">${numsReversed[i]}</span> x <span>2<sup>${i}</sup></span>`;
-        if (i !== 0) {
+        if (i !== 0 || fracNums.length > 0) {
           paraContent += " + ";
         }
-        if (i == 0) {
+        if (i == 0 && fracNums.length == 0) {
           paraContent += `<p class="cal-2">`;
         }
       }
+      
+      if (fracNums.length > 0) {
+        for (let i = 0; i < fracNums.length; i++) {
+          tableContent += `<tr><td>${numsReversed.length + i + 1}.</td><td><span>${
+            fracNums[i]
+          }</span> x <span>2<sup>-${i + 1}</sup></span></td><td>-${i + 1}</td></tr>`;
+          paraContent += `<span class="n">${fracNums[i]}</span> x <span>2<sup>-${i + 1}</sup></span>`;
+          if (i !== fracNums.length - 1) {
+            paraContent += " + ";
+          }
+        }
+        paraContent += `<p class="cal-2">`;
+      }
+      
       for (let j = 0; j < calData.length; j++) {
         paraContent += `<span>${calData[j]}</span>`;
-        if (j !== calData.length - 1) {
+        if (j !== calData.length - 1 || fracNums.length > 0) {
           paraContent += " + ";
         }
       }
+      
+      if (fracNums.length > 0) {
+        paraContent += `<span>${fracDecimal.toFixed(10)}</span>`;
+      }
+      
       tableContent += "</table>";
       paraContent += `</p><p class="cal-2">${decimalResult}</p>
-      <p class="cal-3">(${nums.join(
-        ""
-      )})<sub>2</sub> = (${decimalResult})<sub>10</sub></p></div></div>`;
+      <p class="cal-3">(${displayValue})<sub>2</sub> = (${decimalResult})<sub>10</sub></p></div></div>`;
 
       let filteredContent = "";
-      if (value.length > 1) {
+      if (value.length > 1 || fracNums.length > 0) {
         filteredContent = `     
         ${tableContent}
        <p class="head pad">Solution:</p>
@@ -261,20 +379,19 @@ function binaryToDecimal() {
       } else {
         filteredContent = `<p class="message">No Need To Conversion Steps</p>`;
       }
+      
       result2.innerHTML = `
       <p class="numbers">${coloredDecimalResult.join("")}</p>
         <div class="table-container">
          <p class="head">Binary Number:</p>
-          <div class="number">${nums.join("")}</div>
+          <div class="number">${displayValue}</div>
         <p class="head pad">In Decimal Conversion:</p>
         <div class="number">${decimalResult}</div>
       </div>
       <div class="table-container">
         <p class="head">Conversion in base:</p>
         <div class="base">
-          <p>(${nums.join(
-            ""
-          )})<sub>2</sub> = (${decimalResult})<sub>10</sub></p>
+          <p>(${displayValue})<sub>2</sub> = (${decimalResult})<sub>10</sub></p>
         </div>
       </div>
       <div class="table-container">
@@ -343,11 +460,15 @@ function extractOcta(n) {
 }
 
 function decimalToOcta() {
-  const value = input3.value;
-  const nums = parseInt(Number(value));
+  let value = input3.value;
+  value = value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   input3.value = value;
 
   if (value.length > 0) {
+    const parts = value.split('.');
+    const intPart = parseInt(parts[0]) || 0;
+    const fracPart = parts[1] ? parseFloat('0.' + parts[1]) : 0;
+    
     const {
       octArrayReversed,
       octArrayColorReversed,
@@ -355,7 +476,11 @@ function decimalToOcta() {
       quoData,
       remData,
       dataCount,
-    } = extractOcta(nums);
+    } = extractOcta(intPart);
+    
+    const fracOctal = fracPart > 0 ? fractionalToOctal(fracPart) : '';
+    const fullOctal = fracOctal ? octArrayReversed + '.' + fracOctal : octArrayReversed;
+    
     const remDataReverse = [...remData]
       .map((e) => e + " ")
       .reverse()
@@ -367,26 +492,40 @@ function decimalToOcta() {
       tableContent += `<tr><td>${dataCount[i]}</td><td>${divData[i]}</td><td>${quoData[i]}</td><td>${remData[i]}</td></tr>`;
     }
     tableContent += "</table>";
-    if (nums > 7) {
+    
+    if (intPart > 7) {
       filteredContent = ` 
         ${tableContent}
          <p class="show-num"> Represent as last quotient <b>1</b> and 
          remainder <b>${remDataReverse}</b> like this : <span class="s-n">${octArrayReversed}</span> </p>`;
+      
+      if (fracOctal) {
+        filteredContent += `<p class="show-num">Fractional part converted: <b>0.${parts[1]}</b> to octal: <b>.${fracOctal}</b></p>`;
+      }
     } else {
-      filteredContent = `<p class="message">No Need to Conversion Steps</p>`;
+      if (fracOctal && intPart <= 7) {
+        filteredContent = `<p class="message">Integer part needs no conversion. Fractional part: <b>.${fracOctal}</b></p>`;
+      } else {
+        filteredContent = `<p class="message">No Need to Conversion Steps</p>`;
+      }
     }
+    
+    const fullOctalColored = octArrayColorReversed + (fracOctal ? '.' + fracOctal.split('').map(o => 
+      o === '0' ? `<span class="zero-c">${o}</span>` : `<span class="one-c">${o}</span>`
+    ).join('') : '');
+    
     result3.innerHTML = `
-      <div class="numbers">${octArrayColorReversed}</div>
+      <div class="numbers">${fullOctalColored}</div>
        <div class="table-container">
          <p class="head">Decimal Number:</p>
-          <div class="number">${nums}</div>
+          <div class="number">${value}</div>
         <p class="head pad">In Octal Conversion:</p>
-        <div class="number">${octArrayReversed}</div>
+        <div class="number">${fullOctal}</div>
       </div>
        <div class="table-container">
         <p class="head">Conversion in base:</p>
         <div class="base">
-          <p>(${nums})<sub>10</sub> = (${octArrayReversed})<sub>8</sub></p>
+          <p>(${value})<sub>10</sub> = (${fullOctal})<sub>8</sub></p>
         </div>
       </div>
       <div class="table-container">
@@ -432,54 +571,82 @@ function extractOctaDecimal(nums) {
 
 function octaToDecimal() {
   const value = input5.value.trim();
-  const nums = value.split("").filter((e) => e >= "0" && e <= "7");
+  const parts = value.split('.');
+  const intPart = parts[0] || '';
+  const fracPart = parts[1] || '';
+  
+  const nums = intPart.split("").filter((e) => e >= "0" && e <= "7");
+  const fracNums = fracPart.split("").filter((e) => e >= "0" && e <= "7");
 
   if (nums.length >= 2 && nums[0] == 0) {
     nums.shift();
   }
-  input5.value = nums.join("");
+  
+  const displayValue = nums.join("") + (fracNums.length > 0 ? '.' + fracNums.join("") : '');
+  input5.value = displayValue;
+  
   if (value.length > 0) {
     if (value >= 8) {
       result5.innerHTML = `<div class="table-container">
          <p class="message">Enter number combination less than 8:</p>
       </div>`;
     }
-    if (nums.length !== 0) {
-      const data = extractOctaDecimal(nums);
+    if (nums.length !== 0 || fracNums.length !== 0) {
+      const intDecimal = nums.length > 0 ? extractOctaDecimal(nums).deciNum : 0;
+      const fracDecimal = fracNums.length > 0 ? octalFractionToDecimal(fracNums.join('')) : 0;
+      const decimalResult = intDecimal + fracDecimal;
+      
+      const data = extractOctaDecimal(nums.length > 0 ? nums : ['0']);
       const coloredDecimalResult = data.coloredDeciNum;
-      const decimalResult = data.deciNum;
       const calData = data.calData;
       const numsReversed = nums.slice().reverse();
       let filteredContent = "";
       let tableContent =
         "<table><tr><th>Step</th><th>Conversion</th><th>Power</th></tr>";
-      let paraContent = `<div class="solve"><p class="num">${nums.join(
-        ""
-      )}</p><div class="cal-con"><p class="cal">`;
+      let paraContent = `<div class="solve"><p class="num">${displayValue}</p><div class="cal-con"><p class="cal">`;
+      
       for (let i = numsReversed.length - 1; i >= 0; i--) {
         tableContent += `<tr><td>${numsReversed.length - i}.</td><td><span>${
           numsReversed[i]
         }</span> x <span>8<sup>${i}</sup></span></td><td>${i}</td></tr>`;
         paraContent += `<span class="n">${numsReversed[i]}</span> x <span>8<sup>${i}</sup></span>`;
-        if (i !== 0) {
+        if (i !== 0 || fracNums.length > 0) {
           paraContent += " + ";
         }
-        if (i == 0) {
+        if (i == 0 && fracNums.length == 0) {
           paraContent += `<p class="cal-2">`;
         }
       }
+      
+      if (fracNums.length > 0) {
+        for (let i = 0; i < fracNums.length; i++) {
+          tableContent += `<tr><td>${numsReversed.length + i + 1}.</td><td><span>${
+            fracNums[i]
+          }</span> x <span>8<sup>-${i + 1}</sup></span></td><td>-${i + 1}</td></tr>`;
+          paraContent += `<span class="n">${fracNums[i]}</span> x <span>8<sup>-${i + 1}</sup></span>`;
+          if (i !== fracNums.length - 1) {
+            paraContent += " + ";
+          }
+        }
+        paraContent += `<p class="cal-2">`;
+      }
+      
       for (let j = 0; j < calData.length; j++) {
         paraContent += `<span>${calData[j]}</span>`;
-        if (j !== calData.length - 1) {
+        if (j !== calData.length - 1 || fracNums.length > 0) {
           paraContent += " + ";
         }
       }
+      
+      if (fracNums.length > 0) {
+        paraContent += `<span>${fracDecimal.toFixed(10)}</span>`;
+      }
+      
       tableContent += "</table>";
       paraContent += ` = &nbsp;<span>${decimalResult}</span></p>
-      <p class="cal-3">(${nums.join(
-        ""
-      )})<sub>8</sub> = (${decimalResult})<sub>10</sub></p></div></div>`;
-      if (value.length > 1) {
+      <p class="cal-3">(${displayValue})<sub>8</sub> = (${decimalResult})<sub>10</sub></p></div></div>`;
+      
+      if (value.length > 1 || fracNums.length > 0) {
         filteredContent = `  
           ${tableContent}
           <p class="head pad">Solution:</p>
@@ -487,20 +654,19 @@ function octaToDecimal() {
       } else {
         filteredContent = `<p class="message">No Need To Conversion Steps</p>`;
       }
+      
       result5.innerHTML = `
         <p class="numbers">${coloredDecimalResult.join("")}</p>
         <div class="table-container">
          <p class="head">Octal Digit:</p>
-          <div class="number">${nums.join("")}</div>
+          <div class="number">${displayValue}</div>
         <p class="head pad">In Decimal Conversion:</p>
         <div class="number">${decimalResult}</div>
       </div>
     <div class="table-container">
         <p class="head">Conversion in base:</p>
         <div class="base">
-          <p>(${nums.join(
-            ""
-          )})<sub>8</sub> = (${decimalResult})<sub>10</sub></p>
+          <p>(${displayValue})<sub>8</sub> = (${decimalResult})<sub>10</sub></p>
         </div>
       </div>
      <div class="table-container">
